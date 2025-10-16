@@ -14,7 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const Wallet = () => {
+const WalletComponent = () => {
   const [balance] = useState("45,000.00");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [bankName, setBankName] = useState("");
@@ -23,15 +23,21 @@ const Wallet = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
 
-  const merchantId = 1; // Replace with actual merchant ID from your auth system
+  const merchantId = 1;
 
   const handleDeposit = () => {
-    // Open Nomba payment link in new tab
     window.open("https://checkout.nomba.com/payment-link/5614141336", "_blank");
   };
 
-  const handleWithdraw = async (e) => {
-    e.preventDefault();
+  const handleWithdraw = async () => {
+    if (!withdrawalAmount || !bankName || !accountNumber || !accountName) {
+      setWithdrawalStatus({
+        type: "error",
+        message: "Please fill in all fields",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setWithdrawalStatus(null);
 
@@ -62,7 +68,6 @@ const Wallet = () => {
           ref: data.data.withdrawalRef,
           estimatedTime: data.data.estimatedProcessingTime,
         });
-        // Clear form
         setWithdrawalAmount("");
         setBankName("");
         setAccountNumber("");
@@ -90,7 +95,6 @@ const Wallet = () => {
         <p className="text-gray-600">Manage your Naira portfolio</p>
       </div>
 
-      {/* Balance Card */}
       <Card className="p-6 mb-8 bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg">
         <div className="flex items-center gap-3 mb-4">
           <Wallet className="h-8 w-8" />
@@ -102,7 +106,6 @@ const Wallet = () => {
         </p>
       </Card>
 
-      {/* Deposit/Withdraw Tabs */}
       <Tabs defaultValue="deposit" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-6">
           <TabsTrigger value="deposit" className="gap-2">
@@ -199,7 +202,7 @@ const Wallet = () => {
               </div>
             )}
 
-            <form onSubmit={handleWithdraw} className="space-y-5">
+            <div className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="withdraw-amount">Amount (NGN)</Label>
                 <Input
@@ -208,9 +211,6 @@ const Wallet = () => {
                   placeholder="Enter amount"
                   value={withdrawalAmount}
                   onChange={(e) => setWithdrawalAmount(e.target.value)}
-                  required
-                  min="10"
-                  step="0.01"
                   disabled={isSubmitting}
                 />
                 <p className="text-xs text-gray-500">
@@ -225,7 +225,6 @@ const Wallet = () => {
                   className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                   value={bankName}
                   onChange={(e) => setBankName(e.target.value)}
-                  required
                   disabled={isSubmitting}
                 >
                   <option value="">Select a bank</option>
@@ -251,9 +250,7 @@ const Wallet = () => {
                   placeholder="10-digit account number"
                   value={accountNumber}
                   onChange={(e) => setAccountNumber(e.target.value)}
-                  required
-                  pattern="[0-9]{10}"
-                  maxLength="10"
+                  maxLength={10}
                   disabled={isSubmitting}
                 />
               </div>
@@ -266,7 +263,6 @@ const Wallet = () => {
                   placeholder="Enter account name"
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
-                  required
                   disabled={isSubmitting}
                 />
               </div>
@@ -282,7 +278,7 @@ const Wallet = () => {
               </div>
 
               <Button
-                type="submit"
+                onClick={handleWithdraw}
                 className="w-full h-11 bg-red-600 hover:bg-red-700"
                 disabled={isSubmitting}
               >
@@ -298,7 +294,7 @@ const Wallet = () => {
                   </>
                 )}
               </Button>
-            </form>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>
@@ -306,4 +302,4 @@ const Wallet = () => {
   );
 };
 
-export default Wallet;
+export default WalletComponent;
