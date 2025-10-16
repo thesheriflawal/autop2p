@@ -17,20 +17,33 @@ const Overview = () => {
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [showTradeModal, setShowTradeModal] = useState(false);
   
-  // Fetch merchants (legacy)
+  // Fetch merchants (to map ad.merchantId -> walletAddress etc.)
   const { data: merchantsResponse, isLoading, error } = useMerchants({
-    hasBalance: true,
+    hasBalance: false,
     currency: "USDT",
-    sortBy: "adRate",
-    sortOrder: "ASC",
-    limit: 20
+    limit: 200,
   });
 
-  // Fetch ads to show in marketplace
-  const { data: adsResponse } = useAds({ token: 'USDT', localCurrency: 'NGN', type: activeTab.toUpperCase() as 'BUY' | 'SELL', isActive: true, limit: 50, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
-  
-  // For debugging: also fetch all ads to ensure they exist
-  const { data: allAdsResponse } = useAds({ token: 'USDT', localCurrency: 'NGN', isActive: true, limit: 100 });
+  // Fetch ads: we need both types
+  const { data: buyAdsRes } = useAds({ token: 'USDT', localCurrency: 'NGN', type: 'BUY', isActive: true, limit: 100, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
+  const { data: sellAdsRes } = useAds({ token: 'USDT', localCurrency: 'NGN', type: 'SELL', isActive: true, limit: 100, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
+
+  const merchants: Merchant[] = merchantsResponse?.data?.merchants || [];
+  const merchantsById = new Map<number, Merchant>(merchants.map((m: any) => [m.id, m]));
+
+  // Helper to convert ad -> merchant object with ad overrides
+  const adToMerchant = (ad: any): Merchant | null => {
+    const base = merchantsById.get(ad.merchantId);
+    if (!base) return null;
+    const adjusted: any = { ...base };
+    // Convert NGN price to factor used in UI components
+    const basePrice = 1580;
+    adjusted.adRate = (ad.exchangeRate && basePrice > 0) ? (ad.exchangeRate / basePrice).toFixed(4) : base.adRate;
+    adjusted.minOrder = String(ad.minAmount ?? base.minOrder ?? '0');
+    adjusted.maxOrder = String(ad.maxAmount ?? base.maxOrder ?? '0');
+    adjusted.paymentMethods = ad.paymentMethods ?? base.paymentMethods ?? [];
+    return adjusted as Merchant;
+  };
 
   const handleTradeClick = (merchant: Merchant, type: "buy" | "sell") => {
     setSelectedMerchant(merchant);
@@ -42,14 +55,6 @@ const handleCreateAd = () => {
     navigate('/ad?tab=create');
   };
 
-  const merchants = merchantsResponse?.data?.merchants || [];
-  
-  // Filter merchants for buy/sell orders
-  // For buy orders: show merchants who are selling USDT (have balance)
-  // For sell orders: show merchants who are buying USDT (accepting orders)
-  const availableMerchants = merchants.filter((merchant: Merchant) => 
-    merchant.isActive && parseFloat(merchant.balance) > 0
-  );
 
   return (
     <div>
@@ -71,40 +76,42 @@ const handleCreateAd = () => {
 
         <TabsContent value="buy" className="space-y-4">
           <div className="flex flex-col gap-4">
-            {adsResponse?.data?.ads?.length ? (
-              adsResponse.data.ads.map((ad: any) => (
-                <div key={`ad-buy-${ad.id}`} className="border rounded-lg p-4">
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="font-semibold">₦{(ad.exchangeRate || ad.rate)?.toLocaleString()} / USDT</div>
-                      <div className="text-sm text-muted-foreground">Limits: {(ad.minAmount ?? ad.minOrder)} - {(ad.maxAmount ?? ad.maxOrder)} USDT • Available: {ad.availableAmount} USDT</div>
-                    </div>
-                    <div className="text-xs rounded px-2 py-1 bg-muted">BUY</div>
-                  </div>
-                </div>
-              ))
+            {/* Users buying USDT see SELL ads */}
+            {(sellAdsRes?.data?.ads || []).length ? (
+              (sellAdsRes!.data!.ads as any[])
+                .map(adToMerchant)
+                .filter(Boolean)
+                .map((merchant: any) => (
+                  <OrderCard 
+                    key={`ad-sell-${merchant.id}`}
+                    type="buy"
+                    merchant={merchant}
+                    onTradeClick={handleTradeClick}
+                  />
+                ))
             ) : (
-              <div className="text-muted-foreground p-8 text-center">No ads available</div>
+              <div className="text-muted-foreground p-8 text-center">No sell ads available</div>
             )}
           </div>
         </TabsContent>
 
         <TabsContent value="sell" className="space-y-4">
           <div className="flex flex-col gap-4">
-            {adsResponse?.data?.ads?.length ? (
-              adsResponse.data.ads.map((ad: any) => (
-                <div key={`ad-sell-${ad.id}`} className="border rounded-lg p-4">
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="font-semibold">₦{(ad.exchangeRate || ad.rate)?.toLocaleString()} / USDT</div>
-                      <div className="text-sm text-muted-foreground">Limits: {(ad.minAmount ?? ad.minOrder)} - {(ad.maxAmount ?? ad.maxOrder)} USDT • Available: {ad.availableAmount} USDT</div>
-                    </div>
-                    <div className="text-xs rounded px-2 py-1 bg-muted">SELL</div>
-                  </div>
-                </div>
-              ))
+            {/* Users selling USDT see BUY ads */}
+            {(buyAdsRes?.data?.ads || []).length ? (
+              (buyAdsRes!.data!.ads as any[])
+                .map(adToMerchant)
+                .filter(Boolean)
+                .map((merchant: any) => (
+                  <OrderCard 
+                    key={`ad-buy-${merchant.id}`}
+                    type="sell"
+                    merchant={merchant}
+                    onTradeClick={handleTradeClick}
+                  />
+                ))
             ) : (
-              <div className="text-muted-foreground p-8 text-center">No ads available</div>
+              <div className="text-muted-foreground p-8 text-center">No buy ads available</div>
             )}
           </div>
         </TabsContent>

@@ -37,7 +37,7 @@ const navItems = [
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { address } = useAccount();
   const { balance: headerUsdt } = useUSDTBalance(address);
   const { data: headerMerchant } = useMerchant(address);
@@ -48,7 +48,7 @@ const [isSidebarOpen, setIsSidebarOpen] = useState(false);
       <aside 
         className={cn(
           "fixed left-0 top-0 h-screen w-full md:w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out z-[60]",
-          !isSidebarOpen && "-translate-x-full"
+          !isSidebarOpen && "-translate-x-full md:translate-x-0"
         )}
       >
         <div className="flex h-full flex-col">
@@ -110,7 +110,7 @@ const [isSidebarOpen, setIsSidebarOpen] = useState(false);
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          onClick={() => setIsSidebarOpen((v) => !v)}
         >
           <Menu className="h-5 w-5" />
         </Button>
