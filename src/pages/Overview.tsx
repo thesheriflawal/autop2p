@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/OrderCard";
 import { TradeModal } from "@/components/TradeModal";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMerchants } from "@/hooks/useMerchants";
 import { useAds } from "@/hooks/useAds";
@@ -18,15 +20,11 @@ const Overview = () => {
   const [showTradeModal, setShowTradeModal] = useState(false);
   
   // Fetch merchants (to map ad.merchantId -> walletAddress etc.)
-  const { data: merchantsResponse, isLoading, error } = useMerchants({
-    hasBalance: false,
-    currency: "USDT",
-    limit: 200,
-  });
+  const { data: merchantsResponse, isLoading, error } = useMerchants();
 
   // Fetch ads: we need both types
-  const { data: buyAdsRes } = useAds({ token: 'USDT', localCurrency: 'NGN', type: 'BUY', isActive: true, limit: 100, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
-  const { data: sellAdsRes } = useAds({ token: 'USDT', localCurrency: 'NGN', type: 'SELL', isActive: true, limit: 100, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
+  const { data: buyAdsRes } = useAds({ type: 'BUY', isActive: true, limit: 100 });
+  const { data: sellAdsRes } = useAds({ type: 'SELL', isActive: true, limit: 100 });
 
   const merchants: Merchant[] = merchantsResponse?.data?.merchants || [];
   const merchantsById = new Map<number, Merchant>(merchants.map((m: any) => [m.id, m]));
@@ -36,13 +34,62 @@ const Overview = () => {
     const base = merchantsById.get(ad.merchantId);
     if (!base) return null;
     const adjusted: any = { ...base };
-    // Convert NGN price to factor used in UI components
     const basePrice = 1580;
     adjusted.adRate = (ad.exchangeRate && basePrice > 0) ? (ad.exchangeRate / basePrice).toFixed(4) : base.adRate;
     adjusted.minOrder = String(ad.minAmount ?? base.minOrder ?? '0');
     adjusted.maxOrder = String(ad.maxAmount ?? base.maxOrder ?? '0');
     adjusted.paymentMethods = ad.paymentMethods ?? base.paymentMethods ?? [];
+    adjusted.balance = String(ad.availableAmount ?? base.balance ?? '0');
     return adjusted as Merchant;
+  };
+
+  const renderAds = (ads: any[], type: 'buy' | 'sell') => {
+    if (!ads || ads.length === 0) {
+      return <Card className="p-6 text-center text-muted-foreground">No ads available</Card>;
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        {ads.map((ad: any) => {
+          const rate = Number(ad.exchangeRate ?? ad.rate ?? 0);
+          const min = Number(ad.minAmount ?? ad.minOrder ?? 0);
+          const max = Number(ad.maxAmount ?? ad.maxOrder ?? 0);
+          const available = Number(ad.availableAmount ?? 0);
+          const merchant = adToMerchant(ad);
+          return (
+            <Card key={`ad-${type}-${ad.id}`} className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant={type === 'buy' ? 'default' : 'destructive'}>{type.toUpperCase()}</Badge>
+                    <span className="font-semibold">₦{rate.toLocaleString()} / USDT</span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">{merchant?.name || `Merchant #${ad.merchantId}`}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Limits: {min} - {max} USDT • Available: {available} USDT
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(ad.paymentMethods || []).map((m: string) => (
+                      <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Button
+                    disabled={!merchant}
+                    onClick={() => merchant && handleTradeClick(merchant, type)}
+                  >
+                    {type === 'buy' ? 'Buy USDT' : 'Sell USDT'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    );
   };
 
   const handleTradeClick = (merchant: Merchant, type: "buy" | "sell") => {
@@ -75,45 +122,11 @@ const handleCreateAd = () => {
         </div>
 
         <TabsContent value="buy" className="space-y-4">
-          <div className="flex flex-col gap-4">
-            {/* Users buying USDT see SELL ads */}
-            {(sellAdsRes?.data?.ads || []).length ? (
-              (sellAdsRes!.data!.ads as any[])
-                .map(adToMerchant)
-                .filter(Boolean)
-                .map((merchant: any) => (
-                  <OrderCard 
-                    key={`ad-sell-${merchant.id}`}
-                    type="buy"
-                    merchant={merchant}
-                    onTradeClick={handleTradeClick}
-                  />
-                ))
-            ) : (
-              <div className="text-muted-foreground p-8 text-center">No sell ads available</div>
-            )}
-          </div>
+          {renderAds((sellAdsRes?.data?.ads as any[]) || [], 'buy')}
         </TabsContent>
 
         <TabsContent value="sell" className="space-y-4">
-          <div className="flex flex-col gap-4">
-            {/* Users selling USDT see BUY ads */}
-            {(buyAdsRes?.data?.ads || []).length ? (
-              (buyAdsRes!.data!.ads as any[])
-                .map(adToMerchant)
-                .filter(Boolean)
-                .map((merchant: any) => (
-                  <OrderCard 
-                    key={`ad-buy-${merchant.id}`}
-                    type="sell"
-                    merchant={merchant}
-                    onTradeClick={handleTradeClick}
-                  />
-                ))
-            ) : (
-              <div className="text-muted-foreground p-8 text-center">No buy ads available</div>
-            )}
-          </div>
+          {renderAds((buyAdsRes?.data?.ads as any[]) || [], 'sell')}
         </TabsContent>
       </Tabs>
 
