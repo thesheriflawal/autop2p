@@ -1,65 +1,55 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { OrderCard } from "@/components/OrderCard";
+import { TradeModal } from "@/components/TradeModal";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const mockOrders = {
-  buy: [
-    {
-      user: "Trader001",
-      amount: "5,000",
-      price: "1,580",
-      limit: "₦500 - ₦50,000",
-      payment: ["Bank Transfer", "Opay"],
-      rate: "98.5",
-    },
-    {
-      user: "CryptoKing",
-      amount: "10,000",
-      price: "1,575",
-      limit: "₦1,000 - ₦100,000",
-      payment: ["Bank Transfer", "Palmpay"],
-      rate: "99.2",
-    },
-    {
-      user: "NaijaCrypto",
-      amount: "3,000",
-      price: "1,582",
-      limit: "₦500 - ₦30,000",
-      payment: ["Bank Transfer", "Moniepoint"],
-      rate: "97.8",
-    },
-  ],
-  sell: [
-    {
-      user: "FastTrader",
-      amount: "8,000",
-      price: "1,590",
-      limit: "₦1,000 - ₦80,000",
-      payment: ["Bank Transfer", "Opay", "Kuda"],
-      rate: "99.5",
-    },
-    {
-      user: "P2PMaster",
-      amount: "15,000",
-      price: "1,588",
-      limit: "₦2,000 - ₦150,000",
-      payment: ["Bank Transfer"],
-      rate: "98.9",
-    },
-    {
-      user: "QuickPay",
-      amount: "6,000",
-      price: "1,592",
-      limit: "₦500 - ₦60,000",
-      payment: ["Bank Transfer", "Palmpay", "Opay"],
-      rate: "99.1",
-    },
-  ],
-};
+import { useMerchants } from "@/hooks/useMerchants";
+import { useAds } from "@/hooks/useAds";
+import { useAccount } from "wagmi";
+import type { Merchant } from "@/services/api";
 
 const Overview = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("buy");
+  const { address } = useAccount();
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
+  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
+  const [showTradeModal, setShowTradeModal] = useState(false);
+  
+  // Fetch merchants (legacy)
+  const { data: merchantsResponse, isLoading, error } = useMerchants({
+    hasBalance: true,
+    currency: "USDT",
+    sortBy: "adRate",
+    sortOrder: "ASC",
+    limit: 20
+  });
+
+  // Fetch ads to show in marketplace
+  const { data: adsResponse } = useAds({ token: 'USDT', localCurrency: 'NGN', type: activeTab.toUpperCase() as 'BUY' | 'SELL', isActive: true, limit: 50, sortBy: 'lastActiveAt', sortOrder: 'DESC' });
+  
+  // For debugging: also fetch all ads to ensure they exist
+  const { data: allAdsResponse } = useAds({ token: 'USDT', localCurrency: 'NGN', isActive: true, limit: 100 });
+
+  const handleTradeClick = (merchant: Merchant, type: "buy" | "sell") => {
+    setSelectedMerchant(merchant);
+    setTradeType(type);
+    setShowTradeModal(true);
+  };
+
+const handleCreateAd = () => {
+    navigate('/ad?tab=create');
+  };
+
+  const merchants = merchantsResponse?.data?.merchants || [];
+  
+  // Filter merchants for buy/sell orders
+  // For buy orders: show merchants who are selling USDT (have balance)
+  // For sell orders: show merchants who are buying USDT (accepting orders)
+  const availableMerchants = merchants.filter((merchant: Merchant) => 
+    merchant.isActive && parseFloat(merchant.balance) > 0
+  );
 
   return (
     <div>
@@ -76,25 +66,56 @@ const Overview = () => {
             <TabsTrigger value="buy">Buy Orders</TabsTrigger>
             <TabsTrigger value="sell">Sell Orders</TabsTrigger>
           </TabsList>
-          <Button>Create Ad</Button>
+          <Button onClick={handleCreateAd}>Create Ad</Button>
         </div>
 
         <TabsContent value="buy" className="space-y-4">
           <div className="flex flex-col gap-4">
-            {mockOrders.buy.map((order, index) => (
-              <OrderCard key={index} type="buy" {...order} />
-            ))}
+            {adsResponse?.data?.ads?.length ? (
+              adsResponse.data.ads.map((ad: any) => (
+                <div key={`ad-buy-${ad.id}`} className="border rounded-lg p-4">
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="font-semibold">₦{(ad.exchangeRate || ad.rate)?.toLocaleString()} / USDT</div>
+                      <div className="text-sm text-muted-foreground">Limits: {(ad.minAmount ?? ad.minOrder)} - {(ad.maxAmount ?? ad.maxOrder)} USDT • Available: {ad.availableAmount} USDT</div>
+                    </div>
+                    <div className="text-xs rounded px-2 py-1 bg-muted">BUY</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-muted-foreground p-8 text-center">No ads available</div>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="sell" className="space-y-4">
           <div className="flex flex-col gap-4">
-            {mockOrders.sell.map((order, index) => (
-              <OrderCard key={index} type="sell" {...order} />
-            ))}
+            {adsResponse?.data?.ads?.length ? (
+              adsResponse.data.ads.map((ad: any) => (
+                <div key={`ad-sell-${ad.id}`} className="border rounded-lg p-4">
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="font-semibold">₦{(ad.exchangeRate || ad.rate)?.toLocaleString()} / USDT</div>
+                      <div className="text-sm text-muted-foreground">Limits: {(ad.minAmount ?? ad.minOrder)} - {(ad.maxAmount ?? ad.maxOrder)} USDT • Available: {ad.availableAmount} USDT</div>
+                    </div>
+                    <div className="text-xs rounded px-2 py-1 bg-muted">SELL</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-muted-foreground p-8 text-center">No ads available</div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
+
+      <TradeModal
+        isOpen={showTradeModal}
+        onClose={() => setShowTradeModal(false)}
+        merchant={selectedMerchant}
+        tradeType={tradeType}
+      />
     </div>
   );
 };

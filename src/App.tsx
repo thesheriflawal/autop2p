@@ -16,6 +16,7 @@ import History from "./pages/History";
 import Support from "./pages/Support";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
+import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,7 +37,8 @@ const App = () => (
               <Route path="/history" element={<Layout><History /></Layout>} />
               <Route path="/support" element={<Layout><Support /></Layout>} />
               <Route path="/team" element={<Layout><Team /></Layout>} />
-              <Route path="/settings" element={<Layout><Settings /></Layout>} />
+<Route path="/settings" element={<Layout><Settings /></Layout>} />
+              <Route path="/register" element={<Layout><Register /></Layout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

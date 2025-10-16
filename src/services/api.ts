@@ -25,12 +25,57 @@ export interface Merchant {
   updatedAt: string;
 }
 
+// Ads
+export type AdType = 'BUY' | 'SELL';
+export interface Advertisement {
+  id: number;
+  merchantId: number;
+  title: string;
+  token: 'USDT' | string;
+  type: AdType;
+  exchangeRate: number; // NGN per USDT
+  localCurrency: 'NGN' | string;
+  minAmount: number;
+  maxAmount: number;
+  availableAmount: number;
+  paymentMethods: string[];
+  tradingTerms?: string;
+  autoReply?: string;
+  isActive: boolean;
+  geolocation?: Record<string, any>;
+  tags?: string[];
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastActiveAt?: string;
+}
+
+export interface CreateAdvertisementRequest {
+  title?: string;
+  token: 'USDT' | string;
+  type: AdType;
+  exchangeRate: number; // NGN per USDT
+  localCurrency: 'NGN' | string;
+  minAmount: number;
+  maxAmount: number;
+  availableAmount: number;
+  paymentMethods: string[];
+  tradingTerms?: string;
+  autoReply?: string;
+  geolocation?: Record<string, any>;
+  tags?: string[];
+}
+
 export interface CreateMerchantRequest {
   walletAddress: string;
   name: string;
   email: string;
-  currency: string;
-  paymentMethods: string[];
+  currency?: string;
+  paymentMethods?: string[];
+  // Ad details (optional on create but supported by backend)
+  adRate?: number | string;
+  minOrder?: number | string;
+  maxOrder?: number | string;
 }
 
 export interface Transaction {
@@ -109,6 +154,8 @@ export const merchantApi = {
       accountNumber: string;
       accountName: string;
       narration?: string;
+      bankCode?: string; // optional for backward compatibility
+      bank_code?: string; // optional snake_case variant
     }
   ) => {
     const response = await api.post(`/merchants/${merchantId}/withdrawal`, data);
@@ -146,6 +193,82 @@ export const systemApi = {
 
   getInfo: async () => {
     const response = await api.get('/');
+    return response.data;
+  },
+};
+
+// Payments APIs
+export const paymentsApi = {
+  getBanks: async (): Promise<{
+    success: boolean;
+    message: string;
+    data: { name: string; code: string; logo: string }[];
+    count?: number;
+  }> => {
+    const response = await api.get('/payments/banks');
+    return response.data;
+  },
+};
+
+// Advertisements APIs
+export const adsApi = {
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    token?: string;
+    type?: AdType;
+    minRate?: number;
+    maxRate?: number;
+    localCurrency?: string;
+    paymentMethod?: string;
+    isActive?: boolean;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{ success: boolean; message: string; data: { ads: Advertisement[]; pagination: any } }> => {
+    const response = await api.get('/ads', { params });
+    return response.data;
+  },
+  search: async (params: {
+    q: string;
+    token?: string;
+    type?: AdType;
+    minRate?: number;
+    maxRate?: number;
+    localCurrency?: string;
+    paymentMethods?: string; // comma-separated
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/ads/search', { params });
+    return response.data;
+  },
+  summary: async () => {
+    const response = await api.get('/ads/summary');
+    return response.data;
+  },
+  getById: async (adId: number) => {
+    const response = await api.get(`/ads/${adId}`);
+    return response.data;
+  },
+  getMerchantAds: async (merchantId: number, params?: { page?: number; limit?: number; isActive?: boolean }) => {
+    const response = await api.get(`/merchants/${merchantId}/ads`, { params });
+    return response.data;
+  },
+  create: async (merchantId: number, data: CreateAdvertisementRequest) => {
+    const response = await api.post(`/merchants/${merchantId}/ads`, data);
+    return response.data;
+  },
+  update: async (merchantId: number, adId: number, data: Partial<CreateAdvertisementRequest>) => {
+    const response = await api.put(`/merchants/${merchantId}/ads/${adId}`, data);
+    return response.data;
+  },
+  remove: async (merchantId: number, adId: number) => {
+    const response = await api.delete(`/merchants/${merchantId}/ads/${adId}`);
+    return response.data;
+  },
+  toggle: async (merchantId: number, adId: number) => {
+    const response = await api.patch(`/merchants/${merchantId}/ads/${adId}/toggle`);
     return response.data;
   },
 };

@@ -1,4 +1,7 @@
 import { ReactNode, useState } from "react";
+import { useAccount } from "wagmi";
+import { useUSDTBalance } from "@/hooks/useContract";
+import { useMerchant } from "@/hooks/useMerchants";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -34,22 +37,39 @@ const navItems = [
 
 export const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { address } = useAccount();
+  const { balance: headerUsdt } = useUSDTBalance(address);
+  const { data: headerMerchant } = useMerchant(address);
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
-      {/* Sidebar - Above header */}
+      {/* Sidebar - Above header with higher z-index */}
       <aside 
         className={cn(
-          "fixed left-0 top-0 h-screen w-full md:w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out z-50 md:z-40",
+          "fixed left-0 top-0 h-screen w-full md:w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-in-out z-[60]",
           !isSidebarOpen && "-translate-x-full"
         )}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
-            <img src={logo} alt="AutoP2P" className="h-8 w-8" />
-            <span className="text-xl font-bold text-sidebar-foreground">AutoP2P</span>
+<div 
+            className="flex h-16 items-center justify-between border-b border-sidebar-border px-6 cursor-pointer"
+            onClick={() => setIsSidebarOpen((v) => !v)}
+          >
+            <div className="flex items-center gap-3">
+              <img src={logo} alt="AutoP2P" className="h-8 w-8" />
+              <span className="text-xl font-bold text-sidebar-foreground">AutoP2P</span>
+            </div>
+            {/* Close button for mobile */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
           </div>
 
           {/* Navigation */}
@@ -80,7 +100,7 @@ export const Layout = ({ children }: LayoutProps) => {
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-50 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -92,14 +112,21 @@ export const Layout = ({ children }: LayoutProps) => {
           size="icon"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
-          {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <Menu className="h-5 w-5" />
         </Button>
         
-        <ConnectButton />
+<div className="flex items-center gap-3">
+          {address && (
+            <div className="hidden md:flex items-center gap-2 text-sm">
+              <span className="rounded-md bg-muted px-2 py-1">USDT: {parseFloat(headerUsdt || '0').toLocaleString()}</span>
+              <span className="rounded-md bg-muted px-2 py-1">NGN: ₦{parseFloat(headerMerchant?.data?.balance || '0').toLocaleString()}</span>
+            </div>
+          )}
+          <ConnectButton />
+        </div>
       </header>
 
       <div className="flex w-full">
-
         {/* Main Content */}
         <main 
           className={cn(
