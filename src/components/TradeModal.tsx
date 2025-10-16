@@ -1,66 +1,109 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { AlertCircle, ArrowRight, Clock } from 'lucide-react';
-import { useAccount } from 'wagmi';
-import { useCreateTrade } from '@/hooks/useTrades';
-import type { Merchant } from '@/services/api';
+import { useState, useEffect, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { AlertCircle, ArrowRight, Clock, Search } from "lucide-react";
+import { useAccount } from "wagmi";
+import { useCreateTrade } from "@/hooks/useTrades";
+import type { Merchant } from "@/services/api";
+import { paymentsApi } from "@/services/api";
 
 interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   merchant: Merchant | null;
-  tradeType: 'buy' | 'sell';
+  tradeType: "buy" | "sell";
 }
 
-export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalProps) => {
+export const TradeModal = ({
+  isOpen,
+  onClose,
+  merchant,
+  tradeType,
+}: TradeModalProps) => {
   const { address } = useAccount();
-  const { 
-    initiateTrade, 
-    executeTrade, 
-    isLoading, 
-    isApprovalConfirmed, 
-    isTradeConfirmed, 
-    error 
+  const {
+    initiateTrade,
+    executeTrade,
+    isLoading,
+    isApprovalConfirmed,
+    isTradeConfirmed,
+    error,
   } = useCreateTrade();
 
-  const [amount, setAmount] = useState('');
-  const [accountName, setAccountName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [bankCode, setBankCode] = useState('');
-  const [payoutMethod, setPayoutMethod] = useState<'wallet' | 'bank'>('wallet');
+  const [amount, setAmount] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [payoutMethod, setPayoutMethod] = useState<"wallet" | "bank">("wallet");
   const [step, setStep] = useState(1); // 1: details, 2: approval, 3: trade
+
+  // Banks search list
+  const [banks, setBanks] = useState<{ name: string; code: string; logo?: string }[]>([]);
+  const [bankSearch, setBankSearch] = useState("");
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await paymentsApi.getBanks();
+        if (mounted && res?.data) setBanks(res.data);
+      } catch (e) {
+        // ignore; fallback will be empty list
+        console.warn("[banks] failed", e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const filteredBanks = useMemo(() => {
+    const q = bankSearch.trim().toLowerCase();
+    const list = q ? banks.filter((b) => b.name.toLowerCase().includes(q)) : banks;
+    return list.slice(0, 5);
+  }, [banks, bankSearch]);
 
   if (!merchant) return null;
 
   const handleSubmit = async () => {
     if (!address) {
-      alert('Please connect your wallet');
+      alert("Please connect your wallet");
       return;
     }
 
     // Validate
     if (!amount) {
-      alert('Enter amount');
+      alert("Enter amount");
       return;
     }
-    if (tradeType === 'sell' && payoutMethod === 'bank' && (!accountName || !accountNumber || !bankCode)) {
-      alert('Please enter your bank details');
+    if (
+      tradeType === "sell" &&
+      payoutMethod === "bank" &&
+      (!accountName || !accountNumber || !bankCode)
+    ) {
+      alert("Please enter your bank details");
       return;
     }
 
-    const isWalletPayout = tradeType === 'sell' && payoutMethod === 'wallet';
+    const isWalletPayout = tradeType === "sell" && payoutMethod === "wallet";
 
     const tradeData = {
       merchantId: merchant.id,
       merchantAddress: merchant.walletAddress,
-      accountName: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : accountName) : '',
-      accountNumber: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : accountNumber) : '',
-      bankCode: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : bankCode) : '',
+      accountName:
+        tradeType === "sell" ? (isWalletPayout ? "WALLET" : accountName) : "",
+      accountNumber:
+        tradeType === "sell" ? (isWalletPayout ? "WALLET" : accountNumber) : "",
+      bankCode:
+        tradeType === "sell" ? (isWalletPayout ? "WALLET" : bankCode) : "",
       amount,
     };
 
@@ -70,25 +113,31 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
       await initiateTrade(tradeData);
       setStep(3);
     } catch (error) {
-      console.error('Trade error:', error);
+      console.error("Trade error:", error);
     }
   };
 
   const calculateTotal = () => {
     if (!amount) return 0;
-    const explicitRate = Number((merchant as any).exchangeRate ?? (merchant as any).ngnRate ?? 0);
-    const effectiveRate = isFinite(explicitRate) && explicitRate > 0
-      ? explicitRate
-      : (1580 * (isFinite(parseFloat((merchant as any).adRate)) ? parseFloat((merchant as any).adRate) : 1));
+    const explicitRate = Number(
+      (merchant as any).exchangeRate ?? (merchant as any).ngnRate ?? 0
+    );
+    const effectiveRate =
+      isFinite(explicitRate) && explicitRate > 0
+        ? explicitRate
+        : 1580 *
+          (isFinite(parseFloat((merchant as any).adRate))
+            ? parseFloat((merchant as any).adRate)
+            : 1);
     return parseFloat(amount) * effectiveRate;
   };
 
   const resetModal = () => {
     setStep(1);
-    setAmount('');
-    setAccountName('');
-    setAccountNumber('');
-    setBankCode('');
+    setAmount("");
+    setAccountName("");
+    setAccountNumber("");
+    setBankCode("");
   };
 
   const handleClose = () => {
@@ -101,11 +150,14 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {tradeType === 'buy' ? 'Buy USDT' : 'Sell USDT'}
-            <Badge variant={tradeType === 'buy' ? 'default' : 'destructive'}>
+            {tradeType === "buy" ? "Buy USDT" : "Sell USDT"}
+            <Badge variant={tradeType === "buy" ? "default" : "destructive"}>
               {tradeType.toUpperCase()}
             </Badge>
           </DialogTitle>
+          <DialogDescription>
+            Initiate a {tradeType} trade with the selected merchant.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -117,12 +169,20 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
               </div>
               <div>
                 <p className="font-semibold">{merchant.name}</p>
-                <p className="text-xs text-gray-600">Rate: ₦{(() => {
-                  const rate = Number((merchant as any).exchangeRate ?? (merchant as any).ngnRate ?? 0);
-                  if (isFinite(rate) && rate > 0) return rate.toLocaleString();
-                  const mul = parseFloat((merchant as any).adRate ?? '1');
-                  return (1580 * (isFinite(mul) ? mul : 1)).toLocaleString();
-                })()}</p>
+                <p className="text-xs text-gray-600">
+                  Rate: ₦
+                  {(() => {
+                    const rate = Number(
+                      (merchant as any).exchangeRate ??
+                        (merchant as any).ngnRate ??
+                        0
+                    );
+                    if (isFinite(rate) && rate > 0)
+                      return rate.toLocaleString();
+                    const mul = parseFloat((merchant as any).adRate ?? "1");
+                    return (1580 * (isFinite(mul) ? mul : 1)).toLocaleString();
+                  })()}
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -146,21 +206,43 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                     placeholder="Enter amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    min={Number((merchant as any).minAmount ?? (merchant as any).minOrder ?? 0)}
-                    max={Number((merchant as any).maxAmount ?? (merchant as any).maxOrder ?? 0)}
+                    min={Number(
+                      (merchant as any).minAmount ??
+                        (merchant as any).minOrder ??
+                        0
+                    )}
+                    max={Number(
+                      (merchant as any).maxAmount ??
+                        (merchant as any).maxOrder ??
+                        0
+                    )}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Limit: {Number((merchant as any).minAmount ?? (merchant as any).minOrder ?? 0)} - {Number((merchant as any).maxAmount ?? (merchant as any).maxOrder ?? 0)} USDT
+                    Limit:{" "}
+                    {Number(
+                      (merchant as any).minAmount ??
+                        (merchant as any).minOrder ??
+                        0
+                    )}{" "}
+                    -{" "}
+                    {Number(
+                      (merchant as any).maxAmount ??
+                        (merchant as any).maxOrder ??
+                        0
+                    )}{" "}
+                    USDT
                   </p>
                 </div>
 
                 {amount && (
                   <div className="bg-blue-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium">You will pay: ₦{calculateTotal().toLocaleString()}</p>
+                    <p className="text-sm font-medium">
+                      You will receive: ₦{calculateTotal().toLocaleString()}
+                    </p>
                   </div>
                 )}
 
-                {tradeType === 'sell' && (
+                {tradeType === "sell" && (
                   <>
                     <div className="space-y-2">
                       <Label>Payout Destination</Label>
@@ -170,8 +252,8 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                             type="radio"
                             name="payout"
                             value="wallet"
-                            checked={payoutMethod === 'wallet'}
-                            onChange={() => setPayoutMethod('wallet')}
+                            checked={payoutMethod === "wallet"}
+                            onChange={() => setPayoutMethod("wallet")}
                           />
                           Naira Wallet (in-app)
                         </label>
@@ -180,15 +262,15 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                             type="radio"
                             name="payout"
                             value="bank"
-                            checked={payoutMethod === 'bank'}
-                            onChange={() => setPayoutMethod('bank')}
+                            checked={payoutMethod === "bank"}
+                            onChange={() => setPayoutMethod("bank")}
                           />
                           External Bank
                         </label>
                       </div>
                     </div>
 
-                    {payoutMethod === 'bank' && (
+                    {payoutMethod === "bank" && (
                       <>
                         <div>
                           <Label htmlFor="accountName">Account Name</Label>
@@ -212,21 +294,40 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                         </div>
 
                         <div>
-                          <Label htmlFor="bankCode">Bank</Label>
-                          <select
-                            id="bankCode"
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            value={bankCode}
-                            onChange={(e) => setBankCode(e.target.value)}
-                          >
-                            <option value="">Select bank</option>
-                            <option value="044">Access Bank</option>
-                            <option value="011">First Bank</option>
-                            <option value="058">GTBank</option>
-                            <option value="999999">Kuda Bank</option>
-                            <option value="999992">Opay</option>
-                            <option value="999991">Palmpay</option>
-                          </select>
+                          <Label htmlFor="bankCode">Bank {bankCode && <span className="text-xs text-muted-foreground">(selected: {bankCode})</span>}</Label>
+                          <div className="relative">
+                            <Input
+                              id="bankCode"
+                              placeholder="Search your bank name"
+                              value={bankSearch}
+                              onChange={(e) => setBankSearch(e.target.value)}
+                            />
+                            <Search className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            {filteredBanks.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No banks found</p>
+                            ) : (
+                              filteredBanks.map((b) => (
+                                <button
+                                  key={b.code}
+                                  type="button"
+                                  onClick={() => {
+                                    setBankCode(b.code);
+                                    setBankSearch(b.name);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 rounded border ${
+                                    bankCode === b.code ? 'bg-blue-50 border-blue-200' : 'border-input hover:bg-muted'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm">{b.name}</span>
+                                    <span className="text-xs text-muted-foreground">{b.code}</span>
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -234,12 +335,12 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                 )}
               </div>
 
-              <Button 
-                onClick={handleSubmit} 
+              <Button
+                onClick={handleSubmit}
                 className="w-full"
                 disabled={isLoading || !address}
               >
-                {tradeType === 'buy' ? 'Initiate Purchase' : 'Initiate Sale'}
+                {tradeType === "buy" ? "Initiate Purchase" : "Initiate Sale"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </>
@@ -274,9 +375,12 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <AlertCircle className="h-8 w-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-green-600">Trade Created!</h3>
+              <h3 className="text-lg font-semibold text-green-600">
+                Trade Created!
+              </h3>
               <p className="text-gray-600">
-                Your trade has been created successfully. You can track it in the Pending section.
+                Your trade has been created successfully. You can track it in
+                the Pending section.
               </p>
               <Button onClick={handleClose} className="w-full">
                 Close
