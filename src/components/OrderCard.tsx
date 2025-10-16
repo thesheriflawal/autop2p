@@ -14,7 +14,7 @@ interface OrderCardProps {
 
 export const OrderCard = ({ type, user, amount, price, limit, payment, rate }: OrderCardProps) => {
   return (
-    <Card className="p-4 hover:shadow-soft transition-all duration-300">
+    <Card className="p-4 hover:shadow-soft transition-all duration-300 w-full max-w-3xl mx-auto">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-semibold">
