@@ -32,6 +32,7 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [bankCode, setBankCode] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState<'wallet' | 'bank'>('wallet');
   const [step, setStep] = useState(1); // 1: details, 2: approval, 3: trade
 
   if (!merchant) return null;
@@ -42,29 +43,32 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
       return;
     }
 
-    if (!amount || !accountName || !accountNumber || !bankCode) {
-      alert('Please fill in all fields');
+    // Validate
+    if (!amount) {
+      alert('Enter amount');
       return;
     }
+    if (tradeType === 'sell' && payoutMethod === 'bank' && (!accountName || !accountNumber || !bankCode)) {
+      alert('Please enter your bank details');
+      return;
+    }
+
+    const isWalletPayout = tradeType === 'sell' && payoutMethod === 'wallet';
 
     const tradeData = {
       merchantId: merchant.id,
       merchantAddress: merchant.walletAddress,
-      accountName,
-      accountNumber,
-      bankCode,
+      accountName: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : accountName) : '',
+      accountNumber: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : accountNumber) : '',
+      bankCode: tradeType === 'sell' ? (isWalletPayout ? 'WALLET' : bankCode) : '',
       amount,
     };
 
     try {
       setStep(2);
+      // initiateTrade now handles approve + trade
       await initiateTrade(tradeData);
-      
-      // After approval is confirmed, execute the trade
-      if (isApprovalConfirmed) {
-        setStep(3);
-        executeTrade(tradeData);
-      }
+      setStep(3);
     } catch (error) {
       console.error('Trade error:', error);
     }
@@ -72,9 +76,11 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
 
   const calculateTotal = () => {
     if (!amount) return 0;
-    const basePrice = 1580; // Base USDT price in NGN
-    const adjustedPrice = basePrice * parseFloat(merchant.adRate);
-    return parseFloat(amount) * adjustedPrice;
+    const explicitRate = Number((merchant as any).exchangeRate ?? (merchant as any).ngnRate ?? 0);
+    const effectiveRate = isFinite(explicitRate) && explicitRate > 0
+      ? explicitRate
+      : (1580 * (isFinite(parseFloat((merchant as any).adRate)) ? parseFloat((merchant as any).adRate) : 1));
+    return parseFloat(amount) * effectiveRate;
   };
 
   const resetModal = () => {
@@ -111,7 +117,12 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
               </div>
               <div>
                 <p className="font-semibold">{merchant.name}</p>
-                <p className="text-xs text-gray-600">Rate: ₦{(1580 * parseFloat(merchant.adRate)).toLocaleString()}</p>
+                <p className="text-xs text-gray-600">Rate: ₦{(() => {
+                  const rate = Number((merchant as any).exchangeRate ?? (merchant as any).ngnRate ?? 0);
+                  if (isFinite(rate) && rate > 0) return rate.toLocaleString();
+                  const mul = parseFloat((merchant as any).adRate ?? '1');
+                  return (1580 * (isFinite(mul) ? mul : 1)).toLocaleString();
+                })()}</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -135,11 +146,11 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                     placeholder="Enter amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    min={merchant.minOrder}
-                    max={merchant.maxOrder}
+                    min={Number((merchant as any).minAmount ?? (merchant as any).minOrder ?? 0)}
+                    max={Number((merchant as any).maxAmount ?? (merchant as any).maxOrder ?? 0)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Limit: {merchant.minOrder} - {merchant.maxOrder} USDT
+                    Limit: {Number((merchant as any).minAmount ?? (merchant as any).minOrder ?? 0)} - {Number((merchant as any).maxAmount ?? (merchant as any).maxOrder ?? 0)} USDT
                   </p>
                 </div>
 
@@ -149,46 +160,76 @@ export const TradeModal = ({ isOpen, onClose, merchant, tradeType }: TradeModalP
                   </div>
                 )}
 
-                {tradeType === 'buy' && (
+                {tradeType === 'sell' && (
                   <>
-                    <div>
-                      <Label htmlFor="accountName">Account Name</Label>
-                      <Input
-                        id="accountName"
-                        placeholder="Your full name"
-                        value={accountName}
-                        onChange={(e) => setAccountName(e.target.value)}
-                      />
+                    <div className="space-y-2">
+                      <Label>Payout Destination</Label>
+                      <div className="flex gap-3 text-sm">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="payout"
+                            value="wallet"
+                            checked={payoutMethod === 'wallet'}
+                            onChange={() => setPayoutMethod('wallet')}
+                          />
+                          Naira Wallet (in-app)
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="payout"
+                            value="bank"
+                            checked={payoutMethod === 'bank'}
+                            onChange={() => setPayoutMethod('bank')}
+                          />
+                          External Bank
+                        </label>
+                      </div>
                     </div>
 
-                    <div>
-                      <Label htmlFor="accountNumber">Account Number</Label>
-                      <Input
-                        id="accountNumber"
-                        placeholder="10-digit account number"
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        maxLength={10}
-                      />
-                    </div>
+                    {payoutMethod === 'bank' && (
+                      <>
+                        <div>
+                          <Label htmlFor="accountName">Account Name</Label>
+                          <Input
+                            id="accountName"
+                            placeholder="Your full name"
+                            value={accountName}
+                            onChange={(e) => setAccountName(e.target.value)}
+                          />
+                        </div>
 
-                    <div>
-                      <Label htmlFor="bankCode">Bank</Label>
-                      <select
-                        id="bankCode"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={bankCode}
-                        onChange={(e) => setBankCode(e.target.value)}
-                      >
-                        <option value="">Select bank</option>
-                        <option value="044">Access Bank</option>
-                        <option value="011">First Bank</option>
-                        <option value="058">GTBank</option>
-                        <option value="999999">Kuda Bank</option>
-                        <option value="999992">Opay</option>
-                        <option value="999991">Palmpay</option>
-                      </select>
-                    </div>
+                        <div>
+                          <Label htmlFor="accountNumber">Account Number</Label>
+                          <Input
+                            id="accountNumber"
+                            placeholder="10-digit account number"
+                            value={accountNumber}
+                            onChange={(e) => setAccountNumber(e.target.value)}
+                            maxLength={10}
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="bankCode">Bank</Label>
+                          <select
+                            id="bankCode"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={bankCode}
+                            onChange={(e) => setBankCode(e.target.value)}
+                          >
+                            <option value="">Select bank</option>
+                            <option value="044">Access Bank</option>
+                            <option value="011">First Bank</option>
+                            <option value="058">GTBank</option>
+                            <option value="999999">Kuda Bank</option>
+                            <option value="999992">Opay</option>
+                            <option value="999991">Palmpay</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>

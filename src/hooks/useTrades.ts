@@ -21,8 +21,8 @@ export const useCreateTrade = () => {
   const [error, setError] = useState<string | null>(null);
   
   const { address } = useAccount();
-  const { approve, isPending: approvalPending, isConfirmed: approvalConfirmed } = useUSDT();
-  const { createTrade, isPending: tradePending, isConfirmed: tradeConfirmed, error: tradeError } = useAutoP2P();
+  const { approveForAutoP2P, isPending: approvalPending, isConfirmed: approvalConfirmed } = useUSDT();
+  const { createTradeAsync, isPending: tradePending, isConfirmed: tradeConfirmed, error: tradeError } = useAutoP2P();
 
   const initiateTrade = async (tradeData: TradeData) => {
     try {
@@ -33,13 +33,16 @@ export const useCreateTrade = () => {
         throw new Error('Please connect your wallet');
       }
 
-      // First approve USDT spending
-      await approve(tradeData.merchantAddress, tradeData.amount);
-      
-      // Wait for approval confirmation
-      // Note: In a real implementation, you'd wait for the approval transaction
-      // to be confirmed before proceeding with the trade creation
-      
+      // Approve USDT to AUTO P2P contract, wait for receipt, then create trade
+      await approveForAutoP2P(tradeData.amount);
+      await createTradeAsync(
+        tradeData.merchantId,
+        tradeData.merchantAddress,
+        tradeData.accountName,
+        tradeData.accountNumber,
+        tradeData.bankCode,
+        tradeData.amount
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transaction failed');
     } finally {
@@ -96,10 +99,15 @@ export const useOrderActions = () => {
     if (!address) {
       throw new Error('Please connect your wallet');
     }
-
-    // For sell orders, the user becomes the merchant temporarily
-    // This would require different logic or a separate contract function
-    throw new Error('Sell orders not yet implemented');
+    const tradeData: TradeData = {
+      merchantId: merchant.id,
+      merchantAddress: merchant.walletAddress,
+      accountName: '',
+      accountNumber: '',
+      bankCode: '',
+      amount,
+    };
+    return createTradeHook.initiateTrade(tradeData);
   };
 
   return {

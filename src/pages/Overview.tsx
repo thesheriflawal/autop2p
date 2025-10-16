@@ -13,7 +13,7 @@ import type { Merchant } from "@/services/api";
 
 const Overview = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("buy");
+  const [activeTab, setActiveTab] = useState("sell");
   const { address } = useAccount();
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
@@ -22,8 +22,7 @@ const Overview = () => {
   // Fetch merchants (to map ad.merchantId -> walletAddress etc.)
   const { data: merchantsResponse, isLoading, error } = useMerchants();
 
-  // Fetch ads: we need both types
-  const { data: buyAdsRes } = useAds({ type: 'BUY', isActive: true, limit: 100 });
+  // Fetch ads: we only support SELL ads for now
   const { data: sellAdsRes } = useAds({ type: 'SELL', isActive: true, limit: 100 });
 
   const merchants: Merchant[] = merchantsResponse?.data?.merchants || [];
@@ -40,10 +39,14 @@ const Overview = () => {
     adjusted.maxOrder = String(ad.maxAmount ?? base.maxOrder ?? '0');
     adjusted.paymentMethods = ad.paymentMethods ?? base.paymentMethods ?? [];
     adjusted.balance = String(ad.availableAmount ?? base.balance ?? '0');
+    // carry through exact fields from ad so TradeModal shows the right limits and rate
+    (adjusted as any).exchangeRate = Number(ad.exchangeRate ?? ad.rate ?? 0);
+    (adjusted as any).minAmount = Number(ad.minAmount ?? ad.minOrder ?? 0);
+    (adjusted as any).maxAmount = Number(ad.maxAmount ?? ad.maxOrder ?? 0);
     return adjusted as Merchant;
   };
 
-  const renderAds = (ads: any[], type: 'buy' | 'sell') => {
+  const renderAds = (ads: any[], type: 'sell') => {
     if (!ads || ads.length === 0) {
       return <Card className="p-6 text-center text-muted-foreground">No ads available</Card>;
     }
@@ -115,18 +118,13 @@ const handleCreateAd = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center mb-6">
           <TabsList>
-            <TabsTrigger value="buy">Buy Orders</TabsTrigger>
             <TabsTrigger value="sell">Sell Orders</TabsTrigger>
           </TabsList>
           <Button onClick={handleCreateAd}>Create Ad</Button>
         </div>
 
-        <TabsContent value="buy" className="space-y-4">
-          {renderAds((sellAdsRes?.data?.ads as any[]) || [], 'buy')}
-        </TabsContent>
-
         <TabsContent value="sell" className="space-y-4">
-          {renderAds((buyAdsRes?.data?.ads as any[]) || [], 'sell')}
+          {renderAds((sellAdsRes?.data?.ads as any[]) || [], 'sell')}
         </TabsContent>
       </Tabs>
 

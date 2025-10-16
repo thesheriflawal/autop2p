@@ -1,34 +1,44 @@
-import { useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useWriteContract, useReadContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseUnits, formatUnits, type Address } from 'viem';
 import { CONTRACTS } from '@/config/web3';
 import { AUTOP2P_ABI, USDT_ABI } from '@/config/contracts';
 
 // Hook for USDT token interactions
 export const useUSDT = () => {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
+  const publicClient = usePublicClient();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const approve = (spender: string, amount: string) => {
+  const approve = async (spender: string, amount: string) => {
     const amountInWei = parseUnits(amount, 6);
-    writeContract({
+    const txHash = await writeContractAsync({
       address: CONTRACTS.USDT as Address,
       abi: USDT_ABI,
       functionName: 'approve',
       args: [spender as Address, amountInWei],
     });
+    // wait to ensure allowance is mined before next tx
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
   };
 
-  const faucet = () => {
-    writeContract({
+  const approveForAutoP2P = async (amount: string) => {
+    return approve(CONTRACTS.AUTOP2P, amount);
+  };
+
+  const faucet = async () => {
+    const txHash = await writeContractAsync({
       address: CONTRACTS.USDT as Address,
       abi: USDT_ABI,
       functionName: 'faucet',
     });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
   };
 
-  return { approve, faucet, hash, isPending, isConfirming, isConfirmed, error };
+  return { approve, approveForAutoP2P, faucet, hash, isPending, isConfirming, isConfirmed, error };
 };
 
 // Hook for reading USDT balance
@@ -50,7 +60,8 @@ export const useUSDTBalance = (address?: string) => {
 
 // Hook for AutoP2P contract interactions
 export const useAutoP2P = () => {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
+  const publicClient = usePublicClient();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
@@ -64,7 +75,8 @@ export const useAutoP2P = () => {
     amount: string
   ) => {
     const amountInWei = parseUnits(amount, 6);
-    writeContract({
+    // fire-and-forget variant
+    writeContractAsync({
       address: CONTRACTS.AUTOP2P as Address,
       abi: AUTOP2P_ABI,
       functionName: 'createTrade',
@@ -72,25 +84,48 @@ export const useAutoP2P = () => {
     });
   };
 
-  const releaseFunds = (tradeId: number) => {
-    writeContract({
+  const createTradeAsync = async (
+    merchantId: number,
+    merchantAddress: string,
+    accountName: string,
+    accountNumber: string,
+    bankCode: string,
+    amount: string
+  ) => {
+    const amountInWei = parseUnits(amount, 6);
+    const txHash = await writeContractAsync({
+      address: CONTRACTS.AUTOP2P as Address,
+      abi: AUTOP2P_ABI,
+      functionName: 'createTrade',
+      args: [BigInt(merchantId), merchantAddress as Address, accountName, accountNumber, bankCode, amountInWei],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
+  };
+
+  const releaseFunds = async (tradeId: number) => {
+    const txHash = await writeContractAsync({
       address: CONTRACTS.AUTOP2P as Address,
       abi: AUTOP2P_ABI,
       functionName: 'releaseFunds',
       args: [BigInt(tradeId)],
     });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
   };
 
-  const raiseDispute = (tradeId: number, reason: string) => {
-    writeContract({
+  const raiseDispute = async (tradeId: number, reason: string) => {
+    const txHash = await writeContractAsync({
       address: CONTRACTS.AUTOP2P as Address,
       abi: AUTOP2P_ABI,
       functionName: 'raiseDispute',
       args: [BigInt(tradeId), reason],
     });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return txHash;
   };
 
-  return { createTrade, releaseFunds, raiseDispute, hash, isPending, isConfirming, isConfirmed, error };
+  return { createTrade, createTradeAsync, releaseFunds, raiseDispute, hash, isPending, isConfirming, isConfirmed, error };
 };
 
 // Hook for reading trade data
