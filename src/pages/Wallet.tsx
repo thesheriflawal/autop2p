@@ -192,7 +192,7 @@ const { data: merchantData, refetch: refetchMerchant } = useMerchant(address);
           accountNumber: accountNumber,
           accountName: merchantData?.data?.name || "",
           narration: `Withdrawal - ${merchantData?.data?.name || "Withdrawal"}`,
-          ...(mappedCode ? { bankCode: mappedCode, bankCode: mappedCode } : {}),
+          ...(mappedCode ? { bankCode: mappedCode } : {}),
         },
       } as const;
       console.log("[Withdraw] payload", JSON.parse(JSON.stringify(payload)));

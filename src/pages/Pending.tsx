@@ -86,14 +86,6 @@ const Pending = () => {
     const status = Number(t?.status ?? t?.[10] ?? -1);
     const disputed = Boolean(t?.disputed ?? t?.[11] ?? false);
 
-    // Report visibility once when pending
-    const didReport = useRef(false);
-    useEffect(() => {
-      if (!didReport.current && status !== 2 && status !== 4) {
-        onVisible();
-        didReport.current = true;
-      }
-    }, [status, onVisible]);
 
     // Only show non-completed trades
     if (status === 2 || status === 4) return null;

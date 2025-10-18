@@ -14,10 +14,10 @@ import { Card } from "@/components/ui/card";
 import { AlertCircle, ArrowRight, Clock, Search } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useCreateTrade } from "@/hooks/useTrades";
+import { useTrade } from "@/hooks/useContract";
 import type { Merchant } from "@/services/api";
 import { paymentsApi } from "@/services/api";
 import { toast } from "@/components/ui/sonner";
-import { paymentsApi } from "@/services/api";
 
 interface TradeModalProps {
   isOpen: boolean;
