@@ -11,11 +11,17 @@ import {
 import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useUserTrades, useTrade } from "@/hooks/useContract";
+import { useEffect } from "react";
 import { formatUnits } from "viem";
 
 const History = () => {
   const { address } = useAccount();
-  const { tradeIds, isLoading } = useUserTrades(address);
+  const { tradeIds, isLoading, refetch } = useUserTrades(address);
+
+  useEffect(() => {
+    const id = setInterval(() => refetch(), 5000);
+    return () => clearInterval(id);
+  }, [refetch]);
 
   const formatTradeStatus = (status: number) => {
     const statusMap = {
@@ -38,33 +44,39 @@ const History = () => {
     if (tradeLoading || !trade) {
       return (
         <TableRow>
-          <TableCell colSpan={6} className="text-center py-4">
+          <TableCell colSpan={7} className="text-center py-4">
             <div className="animate-pulse">Loading trade...</div>
           </TableCell>
         </TableRow>
       );
     }
 
-    const [tradeId_, buyer, merchantId, merchantAddress, accountName, accountNumber, bankCode, amount, depositTime, paymentTime, status, disputed, disputeInitiator] = trade;
+    const t: any = trade as any;
+    const tradeId_ = t.tradeId ?? t[0];
+    const accountName = t.accountName ?? t[4] ?? '';
+    const bankCode = t.bankCode ?? t[6] ?? '';
+    const amount = t.amount ?? t[7] ?? 0n;
+    const depositTime = t.depositTime ?? t[8] ?? 0n;
+    const status = Number(t.status ?? t[10] ?? -1);
 
     // Only show completed or cancelled trades in history
     if (status !== 2 && status !== 4) return null;
 
-    const formattedAmount = formatUnits(amount, 6);
-    const statusText = formatTradeStatus(status);
-    const date = formatDate(depositTime);
+    const amtBI = typeof amount === 'bigint' ? amount : BigInt(amount || 0);
+    let formattedAmount = '0';
+    try { formattedAmount = formatUnits(amtBI, 6); } catch {}
+    const depBI = typeof depositTime === 'bigint' ? depositTime : BigInt(depositTime || 0);
+    const date = formatDate(depBI);
 
     return (
       <TableRow>
-        <TableCell className="font-medium">#{tradeId_.toString()}</TableCell>
+        <TableCell className="font-medium">#{String(tradeId_)}</TableCell>
         <TableCell>
-          <Badge variant="default">
-            BUY
-          </Badge>
+          <Badge variant="destructive">SELL</Badge>
         </TableCell>
         <TableCell>{parseFloat(formattedAmount).toLocaleString()} USDT</TableCell>
-        <TableCell className="font-medium">{accountName}</TableCell>
-        <TableCell>{bankCode}</TableCell>
+        <TableCell className="font-medium">{accountName || '—'}</TableCell>
+        <TableCell>{bankCode || '—'}</TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
             {status === 2 ? (
@@ -118,6 +130,9 @@ const History = () => {
         </Card>
       ) : (
         <Card>
+          <div className="flex items-center justify-end p-3 pt-4">
+            <button className="text-sm underline" onClick={() => refetch()}>Refresh</button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -131,9 +146,12 @@ const History = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tradeIds.map((tradeId) => (
-                <TradeRow key={tradeId.toString()} tradeId={tradeId} />
-              ))}
+              {[...(tradeIds || [])]
+                .slice()
+                .sort((a, b) => Number(b) - Number(a))
+                .map((tradeId) => (
+                  <TradeRow key={tradeId.toString()} tradeId={tradeId} />
+                ))}
             </TableBody>
           </Table>
         </Card>

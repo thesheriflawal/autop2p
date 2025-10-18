@@ -9,6 +9,7 @@ export type TradeType = 'buy' | 'sell';
 export interface TradeData {
   merchantId: number;
   merchantAddress: string;
+  adId: number;
   accountName: string;
   accountNumber: string;
   bankCode: string;
@@ -22,7 +23,7 @@ export const useCreateTrade = () => {
   
   const { address } = useAccount();
   const { approveForAutoP2P, isPending: approvalPending, isConfirmed: approvalConfirmed } = useUSDT();
-  const { createTradeAsync, isPending: tradePending, isConfirmed: tradeConfirmed, error: tradeError } = useAutoP2P();
+  const { createTradeAsync, releaseFunds, isPending: tradePending, isConfirmed: tradeConfirmed, error: tradeError } = useAutoP2P();
 
   const initiateTrade = async (tradeData: TradeData) => {
     try {
@@ -35,16 +36,25 @@ export const useCreateTrade = () => {
 
       // Approve USDT to AUTO P2P contract, wait for receipt, then create trade
       await approveForAutoP2P(tradeData.amount);
-      await createTradeAsync(
+      const { tradeId } = await createTradeAsync(
         tradeData.merchantId,
         tradeData.merchantAddress,
+        tradeData.adId,
         tradeData.accountName,
         tradeData.accountNumber,
         tradeData.bankCode,
         tradeData.amount
       );
+
+      // Automated release for in-app wallet payout
+      if (tradeId && tradeData.accountName === 'WALLET' && tradeData.accountNumber === 'WALLET') {
+        await releaseFunds(Number(tradeId));
+      }
+
+      return { tradeId } as const;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Transaction failed');
+      return { tradeId: undefined } as const;
     } finally {
       setIsLoading(false);
     }
@@ -54,6 +64,7 @@ export const useCreateTrade = () => {
     createTrade(
       tradeData.merchantId,
       tradeData.merchantAddress,
+      tradeData.adId,
       tradeData.accountName,
       tradeData.accountNumber,
       tradeData.bankCode,
@@ -102,6 +113,7 @@ export const useOrderActions = () => {
     const tradeData: TradeData = {
       merchantId: merchant.id,
       merchantAddress: merchant.walletAddress,
+      adId: 0,
       accountName: '',
       accountNumber: '',
       bankCode: '',

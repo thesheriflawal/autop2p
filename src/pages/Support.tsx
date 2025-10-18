@@ -24,7 +24,7 @@ const Support = () => {
           </div>
           <Button asChild className="w-full">
             <a
-              href="https://t.me/autop2p_support"
+              href="https://t.me/thesheriflawal"
               target="_blank"
               rel="noopener noreferrer"
             >

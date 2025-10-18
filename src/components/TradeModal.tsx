@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,18 +16,51 @@ import { useAccount } from "wagmi";
 import { useCreateTrade } from "@/hooks/useTrades";
 import type { Merchant } from "@/services/api";
 import { paymentsApi } from "@/services/api";
+import { toast } from "@/components/ui/sonner";
+import { paymentsApi } from "@/services/api";
 
 interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   merchant: Merchant | null;
+  adId?: number; // required by contract createTrade
   tradeType: "buy" | "sell";
 }
+
+// Inline widget to reflect live on-chain status for the last created trade
+const TradeStatusWidget = ({ tradeId, onClose }: { tradeId: number; onClose: () => void }) => {
+  const { trade, isLoading } = useTrade(tradeId);
+  const statusNum = (() => {
+    const t: any = trade as any;
+    return Number(t?.status ?? t?.[10] ?? -1);
+  })();
+  const statusText = (() => {
+    switch (statusNum) {
+      case 0: return 'Deposited (escrowed)';
+      case 1: return 'Payment Made';
+      case 2: return 'Completed (released)';
+      case 3: return 'Disputed';
+      case 4: return 'Cancelled';
+      default: return 'Unknown';
+    }
+  })();
+  return (
+    <div className="text-center space-y-4">
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+        <Clock className={`h-8 w-8 ${statusNum === 2 ? 'text-green-600' : 'text-green-600 animate-spin'}`} />
+      </div>
+      <h3 className="text-lg font-semibold">Trade #{tradeId}</h3>
+      <p className="text-gray-600">Status: {isLoading ? 'Loading...' : statusText}</p>
+      <Button onClick={onClose} className="w-full">Close</Button>
+    </div>
+  );
+};
 
 export const TradeModal = ({
   isOpen,
   onClose,
   merchant,
+  adId,
   tradeType,
 }: TradeModalProps) => {
   const { address } = useAccount();
@@ -44,8 +77,9 @@ export const TradeModal = ({
   const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankCode, setBankCode] = useState("");
-  const [payoutMethod, setPayoutMethod] = useState<"wallet" | "bank">("wallet");
+  const [payoutMethod, setPayoutMethod] = useState<"wallet" | "bank">("bank");
   const [step, setStep] = useState(1); // 1: details, 2: approval, 3: trade
+  const [createdTradeId, setCreatedTradeId] = useState<number | null>(null);
 
   // Banks search list
   const [banks, setBanks] = useState<{ name: string; code: string; logo?: string }[]>([]);
@@ -71,17 +105,42 @@ export const TradeModal = ({
     return list.slice(0, 5);
   }, [banks, bankSearch]);
 
-  if (!merchant) return null;
+  // Reset modal state on open
+  const resetModal = useCallback(() => {
+    setStep(1);
+    setAmount("");
+    setAccountName("");
+    setAccountNumber("");
+    setBankCode("");
+    setCreatedTradeId(null);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      resetModal();
+    }
+  }, [isOpen, resetModal]);
 
   const handleSubmit = async () => {
     if (!address) {
-      alert("Please connect your wallet");
+      toast.error("Please connect your wallet");
       return;
     }
 
     // Validate
-    if (!amount) {
-      alert("Enter amount");
+    const amountNum = parseFloat(amount);
+    if (!amount || isNaN(amountNum) || amountNum <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    const minLim = Number((merchant as any).minAmount ?? (merchant as any).minOrder ?? 0);
+    const maxLim = Number((merchant as any).maxAmount ?? (merchant as any).maxOrder ?? 0);
+    if (minLim && amountNum < minLim) {
+      toast.error(`Amount is below minimum (${minLim})`);
+      return;
+    }
+    if (maxLim && amountNum > maxLim) {
+      toast.error(`Amount is above maximum (${maxLim})`);
       return;
     }
     if (
@@ -89,7 +148,7 @@ export const TradeModal = ({
       payoutMethod === "bank" &&
       (!accountName || !accountNumber || !bankCode)
     ) {
-      alert("Please enter your bank details");
+      toast.error("Please enter your bank details");
       return;
     }
 
@@ -98,6 +157,7 @@ export const TradeModal = ({
     const tradeData = {
       merchantId: merchant.id,
       merchantAddress: merchant.walletAddress,
+      adId: Number(adId ?? (merchant as any).adId ?? 0),
       accountName:
         tradeType === "sell" ? (isWalletPayout ? "WALLET" : accountName) : "",
       accountNumber:
@@ -105,15 +165,21 @@ export const TradeModal = ({
       bankCode:
         tradeType === "sell" ? (isWalletPayout ? "WALLET" : bankCode) : "",
       amount,
-    };
+    } as const;
 
     try {
       setStep(2);
       // initiateTrade now handles approve + trade
-      await initiateTrade(tradeData);
-      setStep(3);
+      const res = await initiateTrade(tradeData);
+      if (res?.tradeId) {
+        setCreatedTradeId(Number(res.tradeId));
+        setStep(3);
+      } else {
+        setStep(1);
+      }
     } catch (error) {
       console.error("Trade error:", error);
+      setStep(1);
     }
   };
 
@@ -132,18 +198,12 @@ export const TradeModal = ({
     return parseFloat(amount) * effectiveRate;
   };
 
-  const resetModal = () => {
-    setStep(1);
-    setAmount("");
-    setAccountName("");
-    setAccountNumber("");
-    setBankCode("");
-  };
-
   const handleClose = () => {
     resetModal();
     onClose();
   };
+
+  if (!merchant) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -194,7 +254,7 @@ export const TradeModal = ({
             </div>
           </Card>
 
-          {step === 1 && (
+          {createdTradeId === null && step === 1 && (
             <>
               {/* Trade Details */}
               <div className="space-y-4">
@@ -304,7 +364,7 @@ export const TradeModal = ({
                             />
                             <Search className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                           </div>
-                          <div className="mt-2 space-y-1">
+                          <div className="mt-2 space-y-1 max-h-56 overflow-auto">
                             {filteredBanks.length === 0 ? (
                               <p className="text-xs text-muted-foreground">No banks found</p>
                             ) : (
@@ -346,7 +406,7 @@ export const TradeModal = ({
             </>
           )}
 
-          {step === 2 && (
+          {createdTradeId === null && step === 2 && (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
                 <Clock className="h-8 w-8 text-blue-600 animate-spin" />
@@ -358,34 +418,20 @@ export const TradeModal = ({
             </div>
           )}
 
-          {step === 3 && (
+          {createdTradeId === null && step === 3 && (
             <div className="text-center space-y-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <Clock className="h-8 w-8 text-green-600 animate-spin" />
               </div>
-              <h3 className="text-lg font-semibold">Creating Trade</h3>
+              <h3 className="text-lg font-semibold">Finalizing</h3>
               <p className="text-gray-600">
-                Your trade is being created on the blockchain. Please wait...
+                Waiting for confirmations and status from the network...
               </p>
             </div>
           )}
 
-          {isTradeConfirmed && (
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <AlertCircle className="h-8 w-8 text-green-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-green-600">
-                Trade Created!
-              </h3>
-              <p className="text-gray-600">
-                Your trade has been created successfully. You can track it in
-                the Pending section.
-              </p>
-              <Button onClick={handleClose} className="w-full">
-                Close
-              </Button>
-            </div>
+          {createdTradeId !== null && (
+            <TradeStatusWidget tradeId={createdTradeId} onClose={handleClose} />
           )}
 
           {error && (

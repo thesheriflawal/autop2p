@@ -59,6 +59,7 @@ const Overview = () => {
           const max = Number(ad.maxAmount ?? ad.maxOrder ?? 0);
           const available = Number(ad.availableAmount ?? 0);
           const merchant = adToMerchant(ad);
+          if (merchant) (merchant as any).adId = ad.id; // attach adId for modal fallback
           return (
             <Card key={`ad-${type}-${ad.id}`} className="p-4">
               <div className="flex items-start justify-between">
@@ -82,7 +83,7 @@ const Overview = () => {
                 <div>
                   <Button
                     disabled={!merchant}
-                    onClick={() => merchant && handleTradeClick(merchant, type)}
+                    onClick={() => merchant && handleTradeClick({ ...(merchant as any), adId: ad.id }, type)}
                   >
                     {type === 'buy' ? 'Buy USDT' : 'Sell USDT'}
                   </Button>
@@ -132,6 +133,7 @@ const handleCreateAd = () => {
         isOpen={showTradeModal}
         onClose={() => setShowTradeModal(false)}
         merchant={selectedMerchant}
+        adId={(selectedMerchant as any)?.adId}
         tradeType={tradeType}
       />
     </div>

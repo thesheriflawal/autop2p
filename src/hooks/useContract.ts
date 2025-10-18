@@ -1,5 +1,5 @@
 import { useWriteContract, useReadContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
-import { parseUnits, formatUnits, type Address } from 'viem';
+import { parseUnits, formatUnits, type Address, decodeEventLog } from 'viem';
 import { CONTRACTS } from '@/config/web3';
 import { AUTOP2P_ABI, USDT_ABI } from '@/config/contracts';
 
@@ -69,6 +69,7 @@ export const useAutoP2P = () => {
   const createTrade = (
     merchantId: number,
     merchantAddress: string,
+    adId: number,
     accountName: string,
     accountNumber: string,
     bankCode: string,
@@ -80,13 +81,14 @@ export const useAutoP2P = () => {
       address: CONTRACTS.AUTOP2P as Address,
       abi: AUTOP2P_ABI,
       functionName: 'createTrade',
-      args: [BigInt(merchantId), merchantAddress as Address, accountName, accountNumber, bankCode, amountInWei],
+      args: [BigInt(merchantId), merchantAddress as Address, BigInt(adId), accountName, accountNumber, bankCode, amountInWei],
     });
   };
 
   const createTradeAsync = async (
     merchantId: number,
     merchantAddress: string,
+    adId: number,
     accountName: string,
     accountNumber: string,
     bankCode: string,
@@ -97,10 +99,26 @@ export const useAutoP2P = () => {
       address: CONTRACTS.AUTOP2P as Address,
       abi: AUTOP2P_ABI,
       functionName: 'createTrade',
-      args: [BigInt(merchantId), merchantAddress as Address, accountName, accountNumber, bankCode, amountInWei],
+      args: [BigInt(merchantId), merchantAddress as Address, BigInt(adId), accountName, accountNumber, bankCode, amountInWei],
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
-    return txHash;
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    // Try to extract tradeId from logs
+    let tradeId: bigint | undefined = undefined;
+    try {
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({ abi: AUTOP2P_ABI, data: log.data, topics: log.topics });
+          if (decoded.eventName === 'TradeCreated') {
+            const args = decoded.args as any;
+            tradeId = (args.tradeId ?? args[0]) as bigint;
+            break;
+          }
+        } catch {}
+      }
+    } catch {}
+
+    return { txHash, tradeId } as const;
   };
 
   const releaseFunds = async (tradeId: number) => {
@@ -110,8 +128,8 @@ export const useAutoP2P = () => {
       functionName: 'releaseFunds',
       args: [BigInt(tradeId)],
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
-    return txHash;
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return { txHash, receipt } as const;
   };
 
   const raiseDispute = async (tradeId: number, reason: string) => {
@@ -135,7 +153,7 @@ export const useTrade = (tradeId?: number) => {
     abi: AUTOP2P_ABI,
     functionName: 'getTrade',
     args: tradeId !== undefined ? [BigInt(tradeId)] : undefined,
-    query: { enabled: tradeId !== undefined },
+    query: { enabled: tradeId !== undefined, refetchInterval: 4000 },
   });
 
   return { trade: data, isLoading, refetch };
@@ -148,7 +166,7 @@ export const useUserTrades = (userAddress?: string) => {
     abi: AUTOP2P_ABI,
     functionName: 'getUserTrades',
     args: userAddress ? [userAddress as Address] : undefined,
-    query: { enabled: !!userAddress },
+    query: { enabled: !!userAddress, refetchInterval: 4000 },
   });
 
   return { tradeIds: data as bigint[] | undefined, isLoading, refetch };

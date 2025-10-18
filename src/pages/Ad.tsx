@@ -381,7 +381,7 @@ const Ad = () => {
                   id="ad-rate"
                   type="number"
                   step="1"
-                  min="100"
+                  min="1"
                   placeholder="e.g., 1580 (your price per USDT in NGN)"
                   value={adRate}
                   onChange={(e) => setAdRate(e.target.value)}
