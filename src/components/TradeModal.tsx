@@ -15,6 +15,7 @@ import { AlertCircle, ArrowRight, Clock, Search } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useCreateTrade } from "@/hooks/useTrades";
 import { useTrade } from "@/hooks/useContract";
+import { useMerchants } from "@/hooks/useMerchants";
 import type { Merchant } from "@/services/api";
 import { paymentsApi } from "@/services/api";
 import { toast } from "@/components/ui/sonner";
@@ -64,6 +65,8 @@ export const TradeModal = ({
   tradeType,
 }: TradeModalProps) => {
   const { address } = useAccount();
+  const { data: merchantsResp } = useMerchants();
+  const merchantsById = useMemo(() => new Map((merchantsResp?.data?.merchants || []).map((m: any) => [m.id, m])), [merchantsResp?.data?.merchants]);
   const {
     initiateTrade,
     executeTrade,
@@ -154,9 +157,15 @@ export const TradeModal = ({
 
     const isWalletPayout = tradeType === "sell" && payoutMethod === "wallet";
 
+    const resolvedMerchantAddr = (
+      (merchantsById.get(merchant.id)?.walletAddress as string | undefined) ||
+      ((merchant as any).merchantAddress as string | undefined) ||
+      merchant.walletAddress
+    );
+
     const tradeData = {
       merchantId: merchant.id,
-      merchantAddress: merchant.walletAddress,
+      merchantAddress: resolvedMerchantAddr,
       adId: Number(adId ?? (merchant as any).adId ?? 0),
       accountName:
         tradeType === "sell" ? (isWalletPayout ? "WALLET" : accountName) : "",
