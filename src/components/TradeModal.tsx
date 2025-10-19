@@ -104,8 +104,18 @@ export const TradeModal = ({
   }, []);
   const filteredBanks = useMemo(() => {
     const q = bankSearch.trim().toLowerCase();
-    const list = q ? banks.filter((b) => b.name.toLowerCase().includes(q)) : banks;
-    return list.slice(0, 5);
+    const isPreferred = (name: string) => {
+      const n = name.replace(/\s+/g, "").toLowerCase();
+      return n.includes("palmpay") || n.includes("opay");
+    };
+    let list = banks;
+    if (q) {
+      list = banks.filter((b) => b.name.toLowerCase().includes(q));
+    } else {
+      // Default view: only show PalmPay and OPay
+      list = banks.filter((b) => isPreferred(b.name));
+    }
+    return list.slice(0, 10);
   }, [banks, bankSearch]);
 
   // Reset modal state on open
@@ -216,7 +226,7 @@ export const TradeModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {tradeType === "buy" ? "Buy USDT" : "Sell USDT"}

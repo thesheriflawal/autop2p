@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from "react";
 
 const Pending = () => {
   const { address } = useAccount();
-  const { tradeIds, isLoading, refetch } = useUserTrades(address);
+  const { tradeIds, isLoading, refetch } = useUserTrades(address || undefined);
   const { releaseFunds, isPending: isReleasing } = useAutoP2P();
   const [visibleCount, setVisibleCount] = useState(0);
   const [releasingTradeId, setReleasingTradeId] = useState<number | null>(null);
@@ -181,18 +181,25 @@ const Pending = () => {
             </Button>
           </div>
           <div className="space-y-4">
-            {[...(tradeIds || [])]
-              .slice()
-              .sort((a, b) => Number(b) - Number(a))
-              .map((tradeId) => (
-                <TradeCard
-                  key={`${tradeId.toString()}-${refreshKey}`}
-                  tradeId={Number(tradeId)}
-                  onReleaseFunds={handleReleaseFunds}
-                  isReleasing={releasingTradeId === Number(tradeId) && isReleasing}
-                  onVisible={() => setVisibleCount((c) => c + 1)}
-                />
-              ))}
+            {(() => {
+              try {
+                const ids = Array.isArray(tradeIds) ? tradeIds : [];
+                return ids
+                  .slice()
+                  .sort((a, b) => Number(b) - Number(a))
+                  .map((tradeId) => (
+                    <TradeCard
+                      key={`${tradeId.toString()}-${refreshKey}`}
+                      tradeId={Number(tradeId)}
+                      onReleaseFunds={handleReleaseFunds}
+                      isReleasing={releasingTradeId === Number(tradeId) && isReleasing}
+                      onVisible={() => setVisibleCount((c) => c + 1)}
+                    />
+                  ));
+              } catch {
+                return null;
+              }
+            })()}
           </div>
           {visibleCount === 0 && (
             <Card className="p-12 text-center">
