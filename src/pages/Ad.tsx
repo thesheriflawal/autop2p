@@ -15,6 +15,8 @@ import { useMerchantAds, useCreateAd, useToggleAd, useUpdateAd, useDeleteAd } fr
 import type { Merchant } from "@/services/api";
 import RegistrationGate from "@/components/RegistrationGate";
 import { useUSDTBalance } from "@/hooks/useContract";
+import { useBybitRate } from "@/hooks/useBybitRate";
+import { applyOffset } from "@/services/rates";
 
 const Ad = () => {
   const { address } = useAccount();
@@ -33,6 +35,13 @@ const Ad = () => {
   const [merchantEmail, setMerchantEmail] = useState('');
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [isCreatingMerchant, setIsCreatingMerchant] = useState(false);
+
+  // Rate automation state
+  const { data: marketRate } = useBybitRate({ refetchIntervalMs: 30_000 });
+  const [autoRate, setAutoRate] = useState(false);
+  const [offsetMode, setOffsetMode] = useState<'minus' | 'plus' | 'equal'>('minus');
+  const [offsetValue, setOffsetValue] = useState('5');
+  const [maxRateManual, setMaxRateManual] = useState('');
 
   const merchant = merchantData?.data;
   const isMerchant = !!merchant;
@@ -68,7 +77,8 @@ const Ad = () => {
 
   // Prefill limits from merchant NGN balance and rate if available
   useEffect(() => {
-    const rate = Number(adRate);
+    const base = autoRate && marketRate ? applyOffset(marketRate, offsetMode, Number(offsetValue || 0)) : Number(adRate);
+    const rate = maxRateManual ? Math.min(base, Number(maxRateManual)) : base;
     const fiat = Number(merchant?.balance || 0); // NGN
     if (isMerchant && isFinite(rate) && rate > 0) {
       const available = Math.floor(fiat / rate) || 0;
@@ -76,7 +86,7 @@ const Ad = () => {
       if (!maxOrder) setMaxOrder(String(Math.max(10, available)));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMerchant, adRate, merchant?.balance]);
+  }, [isMerchant, adRate, merchant?.balance, autoRate, marketRate, offsetMode, offsetValue, maxRateManual]);
 
   const handleCreateAd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,8 +102,9 @@ const Ad = () => {
     }
 
     try {
-      // Parse numbers safely
-      const rate = Number(adRate);
+      // Compute final rate
+      const base = autoRate && marketRate ? applyOffset(marketRate, offsetMode, Number(offsetValue || 0)) : Number(adRate);
+      const rate = maxRateManual ? Math.min(base, Number(maxRateManual)) : base;
       const fiat = Number(merchant?.balance || 0); // NGN available for payouts
       let minAmt = Number(minOrder);
       let maxAmt = Number(maxOrder);
@@ -376,22 +387,72 @@ const Ad = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ad-rate">Buy Ad Price (NGN per USDT)</Label>
-                <Input
-                  id="ad-rate"
-                  type="number"
-                  step="1"
-                  min="1"
-                  placeholder="e.g., 1580 (your price per USDT in NGN)"
-                  value={adRate}
-                  onChange={(e) => setAdRate(e.target.value)}
-                  onFocus={(e) => (e.target as HTMLInputElement).select()}
-                  required
-                  disabled={!address || !isMerchant}
-                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="ad-rate">Rate (NGN per USDT)</Label>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-green-600 dark:text-green-400">Market Rate: {marketRate ? `₦${marketRate.toLocaleString()}/$` : '...'}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Automated</span>
+                      <Switch checked={autoRate} onCheckedChange={setAutoRate} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rate Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Input
+                    id="ad-rate"
+                    type="number"
+                    step="1"
+                    min="1"
+                    placeholder="e.g., 1580"
+                    value={autoRate && marketRate ? String(
+                      (maxRateManual ? Math.min(applyOffset(marketRate, offsetMode, Number(offsetValue||0)), Number(maxRateManual)) : applyOffset(marketRate, offsetMode, Number(offsetValue||0)))
+                    ) : adRate}
+                    onChange={(e) => setAdRate(e.target.value)}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
+                    required
+                    disabled={!address || !isMerchant || (autoRate && !!marketRate)}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="w-24 h-10 rounded-md border bg-background"
+                      value={offsetMode}
+                      onChange={(e) => setOffsetMode(e.target.value as any)}
+                      disabled={!autoRate}
+                    >
+                      <option value="minus">-</option>
+                      <option value="plus">+</option>
+                      <option value="equal">=</option>
+                    </select>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Offset (₦)"
+                      value={offsetValue}
+                      onChange={(e) => setOffsetValue(e.target.value)}
+                      disabled={!autoRate || offsetMode === 'equal'}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="max-rate" className="text-sm">Max Rate (cap)</Label>
+                    <Input
+                      id="max-rate"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Optional cap"
+                      value={maxRateManual}
+                      onChange={(e) => setMaxRateManual(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="min-order">Min Order (USDT)</Label>
                   <Input

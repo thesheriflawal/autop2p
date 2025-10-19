@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import logo from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface LayoutProps {
   children: ReactNode;
@@ -115,7 +116,8 @@ const [isSidebarOpen, setIsSidebarOpen] = useState(true);
           <Menu className="h-5 w-5" />
         </Button>
         
-<div className="flex items-center gap-3">
+<div className="flex items-center gap-2">
+          <ThemeToggle />
           {address && (
             <div className="hidden md:flex items-center gap-2 text-sm">
               <span className="rounded-md bg-muted px-2 py-1">USDT: {parseFloat(headerUsdt || '0').toLocaleString()}</span>
