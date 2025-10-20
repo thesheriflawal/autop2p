@@ -187,7 +187,7 @@ const Ad = () => {
   };
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Advertisement</h1>
         <p className="text-muted-foreground">Create and manage your trading ads</p>

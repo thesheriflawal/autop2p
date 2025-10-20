@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useMerchants } from "@/hooks/useMerchants";
 import { useAds } from "@/hooks/useAds";
 import { useAccount } from "wagmi";
@@ -20,10 +21,10 @@ const Overview = () => {
   const [showTradeModal, setShowTradeModal] = useState(false);
   
   // Fetch merchants (to map ad.merchantId -> walletAddress etc.)
-  const { data: merchantsResponse, isLoading, error } = useMerchants();
+  const { data: merchantsResponse, isLoading: merchantsLoading, error } = useMerchants();
 
   // Fetch ads: we only support SELL ads for now
-  const { data: sellAdsRes } = useAds({ type: 'SELL', isActive: true, limit: 100 });
+  const { data: sellAdsRes, isLoading: adsLoading } = useAds({ type: 'SELL', isActive: true, limit: 100 });
 
   const merchants: Merchant[] = merchantsResponse?.data?.merchants || [];
   const merchantsById = new Map<number, Merchant>(merchants.map((m: any) => [m.id, m]));
@@ -107,8 +108,10 @@ const handleCreateAd = () => {
   };
 
 
+  const isPageLoading = merchantsLoading || adsLoading;
+
   return (
-    <div>
+    <div className="max-w-3xl mx-auto px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Marketplace</h1>
         <p className="text-muted-foreground">
@@ -125,7 +128,32 @@ const handleCreateAd = () => {
         </div>
 
         <TabsContent value="sell" className="space-y-4">
-          {renderAds((sellAdsRes?.data?.ads as any[]) || [], 'sell')}
+          {isPageLoading ? (
+            <div className="flex flex-col gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={`skeleton-${i}`} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2 w-full max-w-[700px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Skeleton className="h-5 w-14" />
+                        <Skeleton className="h-5 w-40" />
+                      </div>
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-4 w-64" />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Skeleton className="h-6 w-20" />
+                        <Skeleton className="h-6 w-20" />
+                        <Skeleton className="h-6 w-24" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-9 w-24" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            renderAds((sellAdsRes?.data?.ads as any[]) || [], 'sell')
+          )}
         </TabsContent>
       </Tabs>
 
