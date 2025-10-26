@@ -39,14 +39,14 @@ AutoP2P integrates three layers:
 1. **Frontend (React + Vite dApp)**
 
    - User dashboard, merchant management, ads discovery, trade tracking.
-   - Wallet connection via RainbowKit/Wagmi (Somnia Sepolia testnet).
+   - Wallet connection via RainbowKit/Wagmi (Lisk Sepolia testnet).
 
 2. **Backend (REST API)**
 
    - Rate syncing, bank integration, merchant profiles, withdrawal logic, and trade automation engine.
    - API base: `https://airp2p-backend.onrender.com/api`
 
-3. **Smart Contracts (Somnia Sepolia)**
+3. **Smart Contracts (Lisk Sepolia)**
    - Core escrow logic: `approve(USDT) → createTrade() → confirmPayment() → releaseFunds()`
    - Deployed test contracts:
      - `AUTOP2P = 0x5c7707D0b70bc56a210464812B0141953e8c95aa`
@@ -100,8 +100,7 @@ AutoP2P integrates three layers:
 
 ## 🌐 Environment
 
-- **Chain:** Somnia Sepolia (id 4202)
-- **Explorer:** [https://shannon-explorer.somnia.network/](https://shannon-explorer.somnia.network/)
+- **Chain:** Lisk Sepolia (id 4202)
 - **Contracts:**
   - AutoP2P: `0x5c7707D0b70bc56a210464812B0141953e8c95aa`
   - USDT: `0xD35d4d76841d6223F7244D6D723E102E38b005b0`
@@ -113,3 +112,4 @@ Our vision is to create **the first truly autonomous P2P exchange**, where users
 AutoP2P is **where DeFi meets automation** — making crypto-fiat trading truly effortless.
 
 © 2025 AutoP2P — _Built for the future of automated P2P trading._
+
