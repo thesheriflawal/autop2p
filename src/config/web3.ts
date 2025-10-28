@@ -27,8 +27,8 @@ export const liskSepolia = defineChain({
 
 // Contract addresses
 export const CONTRACTS = {
-  AUTOP2P: '0x5c7707D0b70bc56a210464812B0141953e8c95aa' as const,
-  USDT: '0xD35d4d76841d6223F7244D6D723E102E38b005b0' as const,
+  AUTOP2P: '0xCB9b33444D8a0c228Cd0878A7C0AeFaF5aC5ac77' as const,
+  USDT: '0x9700712F87B1BF6F5A731882a221BBA27fE34BE0' as const,
 };
 
 // RainbowKit configuration

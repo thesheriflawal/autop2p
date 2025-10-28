@@ -39,18 +39,21 @@ AutoP2P integrates three layers:
 1. **Frontend (React + Vite dApp)**
 
    - User dashboard, merchant management, ads discovery, trade tracking.
-   - Wallet connection via RainbowKit/Wagmi (Lisk Sepolia testnet).
+   - Wallet connection via RainbowKit/Wagmi (Hedera Testnet).
 
 2. **Backend (REST API)**
 
    - Rate syncing, bank integration, merchant profiles, withdrawal logic, and trade automation engine.
    - API base: `https://airp2p-backend.onrender.com/api`
 
-3. **Smart Contracts (Lisk Sepolia)**
+3. **Smart Contracts (Hedera Testnet)**
+
    - Core escrow logic: `approve(USDT) → createTrade() → confirmPayment() → releaseFunds()`
    - Deployed test contracts:
-     - `AUTOP2P = 0x5c7707D0b70bc56a210464812B0141953e8c95aa`
-     - `USDT = 0xD35d4d76841d6223F7244D6D723E102E38b005b0`
+     - `AUTOP2P = 0xCB9b33444D8a0c228Cd0878A7C0AeFaF5aC5ac77`
+     - `USDT = 0x9700712F87B1BF6F5A731882a221BBA27fE34BE0`
+
+   🔗 Explorer: [https://hashscan.io/testnet](https://hashscan.io/testnet)
 
 ## 👥 Target Users
 
@@ -100,10 +103,11 @@ AutoP2P integrates three layers:
 
 ## 🌐 Environment
 
-- **Chain:** Lisk Sepolia (id 4202)
+- **Chain:** Hedera Testnet
+- **Explorer:** [https://hashscan.io/testnet](https://hashscan.io/testnet)
 - **Contracts:**
-  - AutoP2P: `0x5c7707D0b70bc56a210464812B0141953e8c95aa`
-  - USDT: `0xD35d4d76841d6223F7244D6D723E102E38b005b0`
+  - AutoP2P: `0xCB9b33444D8a0c228Cd0878A7C0AeFaF5aC5ac77`
+  - USDT: `0x9700712F87B1BF6F5A731882a221BBA27fE34BE0`
 
 ## 🧠 Vision
 
@@ -112,4 +116,3 @@ Our vision is to create **the first truly autonomous P2P exchange**, where users
 AutoP2P is **where DeFi meets automation** — making crypto-fiat trading truly effortless.
 
 © 2025 AutoP2P — _Built for the future of automated P2P trading._
-
