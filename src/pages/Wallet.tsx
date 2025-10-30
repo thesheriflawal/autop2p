@@ -397,7 +397,7 @@ const { data: merchantData, refetch: refetchMerchant } = useMerchant(address);
               )}
 
               <p className="text-xs text-gray-500 mt-4">
-                Test tokens for Lisk Sepolia testnet only
+                Test tokens for Hedera Sepolia testnet only
               </p>
             </div>
           </Card>

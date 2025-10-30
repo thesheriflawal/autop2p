@@ -2,28 +2,32 @@ import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'wagmi';
 import { defineChain } from 'viem';
 
-// Define Lisk Sepolia chain
-export const liskSepolia = defineChain({
-  id: 4202,
-  name: 'Lisk Sepolia',
+
+export const hederaTestnet = defineChain({
+  id: 296, // Hedera Testnet chain ID (EVM-compatible)
+  name: 'Hedera Testnet',
   nativeCurrency: {
     decimals: 18,
-    name: 'Sepolia Ether',
-    symbol: 'ETH',
+    name: 'Hedera',
+    symbol: 'HBAR',
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.sepolia-api.lisk.com'],
+      http: ['https://testnet.hashio.io/api'],
     },
     public: {
-      http: ['https://rpc.sepolia-api.lisk.com'],
+      http: ['https://testnet.hashio.io/api'],
     },
   },
   blockExplorers: {
-    default: { name: 'Blockscout', url: 'https://sepolia-blockscout.lisk.com' },
+    default: {
+      name: 'HashScan',
+      url: 'https://hashscan.io/testnet',
+    },
   },
   testnet: true,
 });
+
 
 // Contract addresses
 export const CONTRACTS = {
@@ -35,9 +39,9 @@ export const CONTRACTS = {
 export const config = getDefaultConfig({
   appName: 'AutoP2P',
   projectId: 'YOUR_PROJECT_ID', // Get this from WalletConnect Cloud
-  chains: [liskSepolia],
+  chains: [hederaTestnet],
   transports: {
-    [liskSepolia.id]: http(),
+    [hederaTestnet.id]: http(),
   },
   ssr: false,
 });
