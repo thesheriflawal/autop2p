@@ -1,0 +1,29 @@
+{
+  "development": {
+    "username": "airp2p_user",
+    "password": "F08EHrhYOGr4d6BpQHdTBDcJ5KEjgBgv",
+    "database": "airp2p_db",
+    "host": "dpg-d3nuuvt6ubrc73cjj6rg-a.oregon-postgres.render.com",
+    "dialect": "postgres",
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
+  },
+  "test": {
+    "username": "root",
+    "password": null,
+    "database": "database_test",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  },
+  "production": {
+    "username": "root",
+    "password": null,
+    "database": "database_production",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  }
+}
